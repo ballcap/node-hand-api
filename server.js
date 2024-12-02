@@ -13,39 +13,47 @@ app.use(express.static("public"));  // Serve static files from 'public' director
 
 // Route to handle image upload and API request
 app.post("/upload", upload.single("image"), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded." });
+    }
+
     const imagePath = req.file.path;
 
-    // Read image and convert to base64
-    const image = fs.readFileSync(imagePath, { encoding: "base64" });
+    // Read image as raw binary data
+    const image = fs.readFileSync(imagePath);
 
     axios({
         method: "POST",
-        url: "https://outline.roboflow.com/palm-reading-b3tep/1",  // URL of your Roboflow API
+        url: "https://outline.roboflow.com/palm-reading-b3tep/1",
         params: {
-            api_key: "4UvlBs9S1ryZ057JVPnR"  // Replace with your actual API key
+            api_key: "4UvlBs9S1ryZ057JVPnR",
         },
         data: image,
         headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
     })
-        .then(function (response) {
-            // Log the full response to check its structure
+        .then((response) => {
             console.log("API Response:", response.data);
 
-            // Send both the original image (as base64) and the API response data
             res.json({
-                image: `data:image/jpeg;base64,${image}`,  // Base64 image
-                coordinates: response.data.predictions || []  // Send the predictions array (or empty array if not found)
+                image: `data:image/jpeg;base64,${fs.readFileSync(imagePath, {
+                    encoding: "base64",
+                })}`,
+                coordinates: response.data.predictions || [],
             });
         })
-        .catch(function (error) {
-            res.status(500).json({ error: error.message });
+        .catch((error) => {
+            console.error("Error in API call:", error.message);
+            res.status(500).json({ error: "Error processing image." });
+        })
+        .finally(() => {
+            fs.unlink(imagePath, (err) => {
+                if (err) console.error("Error deleting temporary file:", err);
+            });
         });
 });
 
-// Start the server
-const port = 3000;
-app.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
+app.listen(3000, () => {
+    console.log("Server running on http://localhost:3000");
 });
